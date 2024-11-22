@@ -1,0 +1,186 @@
+<body bgcolor=#ffffff>
+<center><h2><strong>Homework 8: Woodworking! (Saurabh Velankar)</strong></h2>
+<p><strong>What's happening?</strong>
+<br>
+1. Aunthentic textures were added from the ambientCG free textures website. (They're free under the Creative Commons License!)
+<br>
+2. You can either cut a piece of wooden log or a wooden box
+<br>
+3. Use the Mouse-Drag option to rotate the scene freely. Use Zoom slider to have a look at the textures in great detail. Use "Shift + Mouse-Drag" to Pan the scene around
+<br>
+4. Use the Progress Slider to cut the wood dynamically! <strong>ENGAGE the SAW before use!</strong></p>
+<br>
+<button id="engage">Engage Saw</button>
+<button id="disengage">Disengage Saw</button>
+Start Cutting! <input type=range id=progress style="width: 400" min=0 max=10 value=0 step=0.1></input>
+Zoom <input type=range id=zoom style="width: 400" min=0.5 max=5 value=0.8 step=0.05></input>
+<button id="cube">Cube</button>
+<button id="cylinder">Cylinder</button>
+
+<canvas id=textureCanvas width=512 height=512 style=position:absolute;left:-1000></canvas>
+<canvas id=canvas1 width=800 height=800></canvas></center>
+<script src=lib.js></script>
+
+<script>
+
+
+   // THE USER DRAGS THE MOUSE TO VARY rx AND ry
+
+   // To have Rotate and "Pan" at the same time
+   let mx, my, rx = 0, ry = 0;
+   let mx1, my1, rx1 = 0, ry1 = 0, isShift = 0;
+   canvas1.onmousedown = e => {
+      if(e.shiftKey)
+      {
+         mx1 = e.clientX;
+         my1 = e.clientY;
+      }
+      mx = e.clientX;
+      my = e.clientY;
+   }
+   canvas1.onmousemove = e => {
+      if(e.shiftKey)
+      {
+         isShift = 1;
+         if (mx1) {
+            rx1 += e.clientX - mx1;
+            ry1 += e.clientY - my1;
+            mx1 = e.clientX;
+            my1 = e.clientY;
+         }
+      }
+      else if (mx) {
+         isShift = 0;
+         rx += e.clientX - mx;
+         ry += e.clientY - my;
+         mx = e.clientX;
+         my = e.clientY;
+      }
+   }
+   canvas1.onmouseup = e => {
+      mx = undefined;
+      mx1 = undefined;
+   }
+
+//wood-3.png //wood-2.png //wood-1.jpg //wood-4.jpg  
+
+   texture(0, 'textures/wood-2.png');
+   texture(1, 'textures/wood-2-normal.png');
+   texture(2, 'textures/wood-3.png');
+   texture(3, 'textures/wood-3-normal.png');
+   texture(4, 'textures/wood-1.jpg');
+   texture(5, 'textures/wood-1-normal.jpg');
+   texture(6, 'textures/wood-4.jpg');
+   texture(7, 'textures/wood-4-normal.jpg');
+   texture(8, 'textures/metal-1.jpg');
+   texture(9, 'textures/machine-1.jpg');
+   texture(10, 'textures/machine-1-normal.jpg');
+
+   // for Main Cube 1 Translation, 0.1 and -0.1 are base, 0.15 is max
+   // For blade 0.8 to -0.5 on the X-axis
+   
+   let textArr = [0,2,4,6];
+   let randomIndex = Math.floor(Math.random() * textArr.length);
+   let randomValue = textArr[randomIndex];
+
+   // Spawn either cube or cylinder
+   let currentPiece = 'cube';
+
+   function updatePiece(newPiece) {
+      //if(progress.value === 0 || progress.value === 10)
+         if (currentPiece !== newPiece) {
+           currentPiece = newPiece;
+         }   
+   }
+   console.log(progress.value);
+
+   // Add event listeners to buttons
+   document.getElementById('cube').addEventListener('click', function() {
+      updatePiece('cube');
+   });
+
+   document.getElementById('cylinder').addEventListener('click', function() {
+      updatePiece('cylinder');
+   });
+
+   let engageBool = 0;
+   //Update the Engage and Disengage Variables
+   document.getElementById('engage').addEventListener('click', function() {
+      engageBool = 1;
+   });
+
+   document.getElementById('disengage').addEventListener('click', function() {
+      engageBool = 0;   
+   });
+
+   let gravity = 0; // Variable for making the Box fall
+   function drawFrame() {
+      requestAnimationFrame(drawFrame);
+      let t = Date.now() / 1000;
+
+      let woodSplit = (progress.value > 0.8) ? ((progress.value / 2) / 100) : 0;
+      let woodTravel = (progress.value/10)*1.41;
+      let tempEngage = Math.sign(engageBool);
+      
+      if(engageBool === 0)
+      {
+         woodSplit = 0; woodTravel = 0; gravity = 0;
+      }
+
+      if(progress.value >= 9.3 && gravity < 0.6)
+      {
+            gravity = gravity + 0.009;
+      }
+      else if (progress.value < 9.3) {
+         gravity = 0;
+      }
+
+      M.S().perspective(3)
+         M.turnX(0.5)
+         // Pan and Rotate the Character based on the X and Y values (Shift should be pressed along with Mouse!)
+         if(isShift) {
+            M.move(rx1/1000, -ry1/1000, 0);
+         } else {
+            M.turnX(ry/100).turnY(rx/100)
+         }
+         M.scale(zoom.value)
+
+         M.S().turnY(2.5)
+            // Follow this order: Shape, color, opacity, texture, bumpTexture
+
+            M.scale(1.0, 1.0, 1.0).move(-0.5,0.9,0.)
+               if(currentPiece === 'cube') {
+                  M.S().move(0.1 + woodTravel,-.32 - gravity, 0.1).turnY(0).scale(0.2, 0.1, 0.1).draw(Cube(), [1,1,1], 1, randomValue, randomValue + 1).R();    // Cube 1st half
+                  M.S().move(0.1 + woodTravel,-.32 - gravity, -0.1 - woodSplit * 0.3).turnY(woodSplit).scale(0.2, 0.1, 0.1).draw(Cube(), [1,1,1], 1, randomValue, randomValue + 1).R();   // Cube 2nd half
+               }
+               else {
+                  M.S().move(0.1+woodTravel,-.32 - gravity, 0.1).turnY(0).scale(0.1, 0.1, 0.1).draw(Cylinder(40,1), [1,1,1], 1, randomValue, randomValue + 1).R();    // Cylinder 1st half
+                  M.S().move(0.1+woodTravel,-.32 - gravity, -0.1 - woodSplit*0.3).turnY(woodSplit).scale(0.1, 0.1, 0.1).draw(Cylinder(40,1), [1,1,1], 1, randomValue, randomValue + 1).R();   // Cylinder 2nd half
+               }
+               M.S().move(0.1,-.47,-0.2).scale(0.4, 0.05, 0.4).draw(Cube(), [1,1,1], 1, 2, 3).R();                   // Table1
+               M.S().move(0.9,-.47,-0.31).scale(0.4, 0.05, 0.29).draw(Cube(), [1,1,1], 1, 2, 3).R();                 // Table2   
+               M.S().move(0.9,-.47,0.1).scale(0.4, 0.05, 0.1).draw(Cube(), [1,1,1], 1, 2, 3).R();                    // Table3
+               M.S().move(0.5,-.47,0.257).turnX(1.55).scale(0.8, 0.05, 0.3).draw(Cube(), [1,1,1], 1, 2, 3).R();      // Side profile
+               for(let side1 = -1; side1 <= 1; side1 = side1 + 2) {
+                  for(let side2 = -1; side2 <= 1; side2 = side2 + 2){
+                     M.S().move(0.,0.,-0.4).move(0.5 + side1 * 0.7,-.8,0.257 + side2 * 0.4).scale(0.05, 0.3, 0.05).draw(Cube(), [1,1,1], 1, 2, 3).R();      // All 4 Legs
+                  }
+               }
+
+
+            M.S().move(0.8,-.7 + engageBool*0.2,0).turnZ(t*50*tempEngage).scale(0.3, 0.3, 0.003).draw(Cylinder(40), [1,1,1], 1, 8, -1).R(); //Blade
+            if(progress.value >= 0.5 && progress.value <= 0.7) { // Flying "Sparks"
+               while(true) {
+                  break;
+               }
+            }
+            M.S().move(0.8,-.7,0).scale(0.4, 0.2, 0.2).draw(Cube(), [0.2,0.2,0.2], 1, -1, 10).R();      // Machine Box
+
+         M.R()
+      M.R()
+      M.R()
+   }
+   requestAnimationFrame(drawFrame);
+
+</script>
+
