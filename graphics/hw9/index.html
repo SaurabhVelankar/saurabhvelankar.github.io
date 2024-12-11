@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <style>
+
+      #curve-options {
+      display: none; /* Initially hidden */
+      flex-direction: column;
+      margin-top: 10px;
+      }
+
+      #curve-options button {
+      margin: 5px 0;
+      padding: 10px;
+      width: 200px;
+      background-color: #8baf4c; vertical-align: middle;
+      color: white; border: solid 2px darkgreen;
+      font-size: 16px;
+      cursor: pointer;
+      }
+
+      #curve-options button:hover {
+      background-color: #45a083;
+      }
+
+      #select-curve {
+      background-color: #008CBA;
+      color: white;
+      width: auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: solid 2px darkblue;
+      cursor: pointer;
+      }
+
+      #select-curve:hover {
+      background-color: #007bb5;
+      }
+
+      #editor-tools {
+      display: none; /* Initially hidden */
+      flex-direction: column;
+      margin-top: 10px;
+      }
+
+      #editor-tools button {
+      margin: 5px 0;
+      padding: 10px;
+      width: auto;
+      background-color: #ff9844;
+      color: white;
+      font-size: 16px;
+      border: solid 2px darkorange;
+      cursor: pointer;
+      }
+
+      #editor-tools button:hover {
+      background-color: #9e6232;
+      }
+
+      #curve-editor-tools {
+      text-align: center;
+      background-color: #fdba11;
+      color: white;
+      width: auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: solid 2px darkorange;
+      cursor: pointer;
+      }
+
+      #curve-editor-tools:hover {
+      background-color: #ffda7b;
+      }
+
+      body {
+         margin: 0;
+         padding: 0;
+      }
+      canvas {
+         position: absolute;
+         width: 100%;
+         height: 100%;
+      }
+      .buttons {
+         position: absolute;
+         z-index: 1;
+      }
+      button {
+         position: relative;
+         width: 100px;
+         height: 30px;
+         top: 5px;
+         left: 5px;
+         margin-right: 5px;
+      }
+   </style>
+</head>
+<body>
+   <h1 style = "text-align: center; color: rgb(0, 0, 0);">Homework 9 (Splines!), Saurabh Velankar, ssv7305</h1>
+<p style="color: rgb(0, 0, 0); text-align: center;">
+   <strong>Instructions:</strong>
+   <br>
+   1. Click on the Orange Button Below to access the Spline Edit tools such as move and remove Points
+   <br>
+   2. Click on the Green Button Below to Change the Spline/Curve Type
+   <br>
+   3. After selecting "Add Points", Click anywhere on the screen to star making curves (Remember to deselect buttons due to issues with HTML alignment :)
+   <br>
+   4. Can you make an interesting shape using the move and remove function?
+</p>
+   <div class="buttons">
+      <button id="curve-editor-tools">Curve Editor Tools</button>
+      <div id="editor-tools" style="display: none;">
+         <button name="spline" id="spline">Add Points</button>
+         <button name="move" id="move">Move Point</button>
+         <button name="remove" id="remove">Remove Point</button>
+         <button name="clear" id="clear">Clear All</button>
+      </div>
+
+      <!--Dropdown Start-->
+      <button id="select-curve">Select Curve</button>
+      <div id="curve-options" style="display: none;"> 
+         <button name="linear" id="linear">Linear</button>
+         <button name="hermite" id="hermite">Hermite</button>
+         <button name="bspline" id="bspline">BSpline</button>
+         <button name="catmullrom" id="catmullrom">CatmullRom</button>
+      </div>
+      <!--Dropdown End-->
+      
+   </div>
+   <div style="position: absolute; width: 100%; height: 100%; top: 0;">
+      <canvas id="render_canvas"></canvas>
+      <canvas id="canvas"></canvas>
+   </div>
+   
+<!-- Splines Logic Start -->
+<script>
+
+   // Linear Spline
+   Linear = function(ctx, points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    let path_pixels = [];
+    for (let i = 0; i < points.length - 1; i++) {
+        let p0 = points[i];
+        let p1 = points[i + 1];
+
+        for (let j = 0; j < 100; j++) {
+            let t = j / 100;
+            let x = p0.x + t * (p1.x - p0.x);
+            let y = p0.y + t * (p1.y - p0.y);
+            path_pixels.push({x, y});
+        }
+        ctx.lineTo(p1.x, p1.y);
+    }
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.closePath();
+    return path_pixels;
+   }
+
+   // Hermite Splines
+   Hermite = function(ctx, points) {
+      const tangents = [];
+      const n = points.length;
+      let path_pixels = [];
+
+      for (let i = 0; i < n; i++) {
+         if (i === 0) {
+               // Tangent at the first point
+               tangents.push([points[1].x - points[0].x, points[1].y - points[0].y]);
+         } else if (i === n - 1) {
+               // Tangent at the last point
+               tangents.push([points[n - 1].x - points[n - 2].x, points[n - 1].y - points[n - 2].y]);
+         } else {
+               // Tangents for intermediate points
+               tangents.push([
+                  (points[i + 1].x - points[i - 1].x) / 2,
+                  (points[i + 1].y - points[i - 1].y) / 2
+               ]);
+         }
+      }
+
+      let hermiteBasis = (t) => {
+         return [
+               2 * t ** 3 - 3 * t ** 2 + 1, // a
+               -2 * t ** 3 + 3 * t ** 2,    // b
+               t ** 3 - 2 * t ** 2 + t,     // c
+               t ** 3 - t ** 2              // d
+         ];
+      }
+
+      let hermiteSpline = (P0, P1, R0, R1, numPoints = 100) => {
+         const curve = [];
+         for (let i = 0; i <= numPoints; i++) {
+               const t = i / numPoints;
+               const [a, b, c, d] = hermiteBasis(t);
+
+               const x = a * P0.x + b * P1.x + c * R0[0] + d * R1[0];
+               const y = a * P0.y + b * P1.y + c * R0[1] + d * R1[1];
+
+               curve.push({x, y});
+               path_pixels.push({x, y});
+         }
+         return curve;
+      }
+
+
+      ctx.beginPath();
+      for (let i = 0; i < points.length - 1; i++) {
+         const P0 = points[i];
+         const P1 = points[i + 1];
+         const R0 = tangents[i];
+         const R1 = tangents[i + 1];
+
+         const curve = hermiteSpline(P0, P1, R0, R1);
+
+         // Draw the curve
+         ctx.moveTo(curve[0].x, curve[0].y);
+         for (let j = 1; j < curve.length; j++) {
+               ctx.lineTo(curve[j].x, curve[j].y);
+         }
+         ctx.strokeStyle = "black";
+         ctx.lineWidth = 2;
+         ctx.stroke();
+      }
+      ctx.closePath();
+      return path_pixels;
+   }
+
+   // Logic for BSplines
+   BSpline = function(ctx, points) {
+      let path_pixels = [];
+
+      let bsplineBasis = (t) => {
+         return [
+               (1 - t) ** 3 / 6,                           // a
+               (3 * t ** 3 - 6 * t ** 2 + 4) / 6,          // b
+               (-3 * t ** 3 + 3 * t ** 2 + 3 * t + 1) / 6, // c
+               t ** 3 / 6                                  // d
+         ];
+      }
+
+      let bsplineCurve = (P0, P1, P2, P3, numPoints = 100) => {
+         const curve = [];
+         for (let i = 0; i <= numPoints; i++) {
+               const t = i / numPoints;
+               const [a, b, c, d] = bsplineBasis(t);
+
+               const x = a * P0.x + b * P1.x + c * P2.x + d * P3.x;
+               const y = a * P0.y + b * P1.y + c * P2.y + d * P3.y;
+
+               curve.push({x, y});
+               path_pixels.push({x, y});
+         }
+         return curve;
+      }
+
+      ctx.beginPath();
+      for (let i = 0; i < points.length - 3; i++) {
+         const P0 = points[i];
+         const P1 = points[i + 1];
+         const P2 = points[i + 2];
+         const P3 = points[i + 3];
+
+         const curve = bsplineCurve(P0, P1, P2, P3);
+
+         // Draw the curve
+         ctx.moveTo(curve[0].x, curve[0].y);
+         for (let j = 1; j < curve.length; j++) {
+               ctx.lineTo(curve[j].x, curve[j].y);
+         }
+         ctx.strokeStyle = "black";
+         ctx.lineWidth = 2;
+         ctx.stroke();
+      }
+      ctx.closePath();
+      return path_pixels;
+   }
+
+   // Logic for CatmullRom Curves
+   CatmullRom = function(ctx, points) {
+      let path_pixels = [];
+
+      let catmullRomBasis = (t) => {
+         return [
+               -0.5 * t ** 3 + t ** 2 - 0.5 * t,       // a
+               1.5 * t ** 3 - 2.5 * t ** 2 + 1,        // b
+               -1.5 * t ** 3 + 2 * t ** 2 + 0.5 * t,   // c
+               0.5 * t ** 3 - 0.5 * t ** 2             // d
+         ];
+      }
+
+      let catmullRomCurve = (P0, P1, P2, P3, numPoints = 100) => {
+         const curve = [];
+         for (let i = 0; i <= numPoints; i++) {
+               const t = i / numPoints;
+               const [a, b, c, d] = catmullRomBasis(t);
+
+               const x = a * P0.x + b * P1.x + c * P2.x + d * P3.x;
+               const y = a * P0.y + b * P1.y + c * P2.y + d * P3.y;
+
+               curve.push({x, y});
+               path_pixels.push({x, y});
+         }
+         return curve;
+      }
+
+      ctx.beginPath();
+      for (let i = 0; i < points.length - 3; i++) {
+         const P0 = points[i];
+         const P1 = points[i + 1];
+         const P2 = points[i + 2];
+         const P3 = points[i + 3];
+
+         const curve = catmullRomCurve(P0, P1, P2, P3);
+
+         // Draw the curve
+         ctx.moveTo(curve[0].x, curve[0].y);
+         for (let j = 1; j < curve.length; j++) {
+               ctx.lineTo(curve[j].x, curve[j].y);
+         }
+         ctx.strokeStyle = "black";
+         ctx.lineWidth = 2;
+         ctx.stroke();
+      }
+      ctx.closePath();
+      return path_pixels;
+   }
+</script>
+
+<!-- Splines Logic End -->
+
+<!--Other Logic including Rendering-->
+<script>
+
+      document.getElementById("select-curve").addEventListener("click", function() {
+      var curveOptions = document.getElementById("curve-options");
+
+      // Toggle the display between 'none' and 'block'
+      if (curveOptions.style.display === "none") {
+         curveOptions.style.display = "flex";  // Show the options in a column
+      } else {
+         curveOptions.style.display = "none";  // Hide the options again
+      }
+      });
+
+      document.getElementById("curve-editor-tools").addEventListener("click", function() {
+      var editorTools = document.getElementById("editor-tools");
+
+      // Toggle the display between 'none' and 'block'
+      if (editorTools.style.display === "none") {
+         editorTools.style.display = "flex"; // Show the options in a column
+      } else {
+         editorTools.style.display = "none"; // Hide the options again
+      }
+      });
+
+
+      const devicePixelRatio = window.devicePixelRatio || 1;
+
+      let canvas = document.getElementById('canvas');
+      let render_canvas = document.getElementById('render_canvas');
+      let ctx = canvas.getContext('2d');
+
+      function resizeCanvas() {
+         canvas.width = window.innerWidth * devicePixelRatio;
+         canvas.height = window.innerHeight * devicePixelRatio;
+
+         render_canvas.width = window.innerWidth * devicePixelRatio;
+         render_canvas.height = window.innerHeight * devicePixelRatio;
+         gl.viewport(0, 0, render_canvas.width, render_canvas.height);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+
+      let coord = (x,y) => {
+         return {x, y};
+      }
+
+      let getPoint = (e) => {
+         let rect = canvas.getBoundingClientRect();
+         let x = (e.clientX * devicePixelRatio) - rect.left;
+         let y = (e.clientY * devicePixelRatio) - rect.top;
+         return coord(x, y);
+      }
+
+      // Comment out or delete!
+      let setMode = (e) => {
+         mode = e.target.id;
+         /*if (mode === "spline")
+            document.querySelector('.splines').style.display = 'inline-block';
+         else
+            document.querySelector('.splines').style.display = 'inline-block';*/
+      }
+
+      let setSpline = (e) => {
+         splineType = e.target.id;
+         renderPoints();
+         setPositions();
+      }
+
+      let clear = (e) => {
+         ctx.clearRect(0, 0, canvas.width, canvas.height);
+         points = [];
+         closed = false;
+         pixels = [];
+         positions = [];
+         position = 0;
+         gl.clearColor(0.0, 0.0, 0.0, 0.0); // Set the clear color to transparent
+         gl.clearDepth(1.0); // Clear everything
+         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear the color and depth buffer
+         reloadShaders();
+      }
+
+      let closePoints = (e) => {
+         if (points.length < 4) return;
+         closed = true;
+         renderPoints();
+         setPositions();
+      }
+
+      let setPositions = () => {
+         positions = pixels.map(p => canvasToWebGLCoords(p.x, p.y, canvas))
+         position = 0;
+      }
+
+      let mode = "spline";
+      let splineType = "catmullrom";
+
+      let points = [];
+      let activePoint = null;
+      let closed = false;
+      let pixels = [];
+
+      let positions = [];
+      let position = 0;
+
+      document.body.addEventListener('mousedown', (e) => {
+         switch(e.target.id) {
+            case "canvas": canvasDown(e); break;
+            case "spline": setMode(e); break;
+            case "move": setMode(e); break;
+            case "remove": setMode(e); break;
+            case "clear": clear(e); break;
+            case "close": closePoints(e); break;
+            case "linear": setSpline(e); break;
+            case "hermite": setSpline(e); break;
+            case "bspline": setSpline(e); break;
+            case "catmullrom": setSpline(e); break;
+         }
+      })
+
+      document.body.addEventListener('mouseup', (e) => {
+         switch(e.target.id) {
+            case "canvas": canvasUp(e); break;
+         }
+      })
+
+      document.body.addEventListener('mousemove', (e) => {
+         if (activePoint) {
+            let dot = document.getElementById('dot') || redDotCursor(e.clientX, e.clientY);
+            let point = getPoint(e);
+            activePoint.x = point.x;
+            activePoint.y = point.y;
+            dot.style.left = e.clientX + 'px';
+            dot.style.top = e.clientY + 'px';
+            renderPoints();
+         }
+      })
+
+      let canvasDown = (e) => {
+         if (closed) return;
+         let point = getPoint(e);
+         if (point.y < 40) return;
+         let overlap = points.some(p => Math.abs(p.x - point.x) < 10 && Math.abs(p.y - point.y) < 10);
+         switch (mode) {
+            case "spline": addPoint(point, overlap); break;
+            case "move": selectPoint(point, overlap); break;
+            case "remove": removePoint(point, overlap); break;
+         }
+      }
+
+      let canvasUp = (e) => {
+         let point = getPoint(e);
+         switch (mode) {
+            case "spline": renderPoints(); break;
+            case "move": movePoint(point); break;
+            case "remove": renderPoints(); break;
+         }
+      }
+
+      let metapoints = () => {
+         if (!closed) return points;
+         switch (splineType) {
+            case "linear": return points.concat(points[0]);
+            case "hermite": return points.concat(points[0]);
+            case "bspline": return points.concat(points[0]).concat(points[1]).concat(points[2]).concat(points[3]);
+            case "catmullrom": return points.concat(points[0]).concat(points[1]).concat(points[2]).concat(points[3]);
+         }
+      }
+
+      let addPoint = (point, overlap) => {
+         if (overlap) return;
+         points.push(point);
+      }
+
+      let selectPoint = (point, overlap) => {
+         if (overlap) {
+            activePoint = points.find(p => Math.abs(p.x - point.x) < 10 && Math.abs(p.y - point.y) < 10);
+         }
+      }
+
+      let removePoint = (point, overlap) => {
+         if (overlap) {
+            points = points.filter(p => Math.abs(p.x - point.x) > 10 || Math.abs(p.y - point.y) > 10);
+         }
+      }
+
+      let movePoint = (point) => {
+         if (activePoint) {
+            activePoint.x = point.x;
+            activePoint.y = point.y;
+            activePoint = null;
+         }
+         document.getElementById('dot')?.remove();
+         renderPoints();
+      }
+
+      let renderPoints = () => {
+         ctx.clearRect(0, 0, canvas.width, canvas.height);
+         if (points.length == 0) return;
+         renderCurve();
+         points.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+         });
+      }
+
+      let renderCurve = () => {
+         if (points.length < 2) return;
+         switch (splineType) {
+            case "linear": pixels = Linear(ctx, metapoints()); break;
+            case "hermite": pixels = Hermite(ctx, metapoints()); break;
+            case "bspline": pixels = BSpline(ctx, metapoints()); break;
+            case "catmullrom": pixels = CatmullRom(ctx, metapoints()); break;
+         }
+      }
+
+      /*let redDotCursor = (x, y) => {
+         let dot = document.createElement('div');
+         dot.id = 'dot';
+         dot.style.position = 'absolute';
+         dot.style.width = `${10 / devicePixelRatio}px`;
+         dot.style.height = `${10 / devicePixelRatio}px`;
+         dot.style.backgroundColor = 'red';
+         dot.style.left = x + 'px';
+         dot.style.top = y + 'px';
+         dot.style.pointerEvents = 'none';
+         document.body.appendChild(dot);
+         return dot;
+      }*/
+
+      let canvasToWebGLCoords = (x, y, canvas) => {
+         let rect = canvas.getBoundingClientRect();
+         let webGLX = ((x - rect.left) / rect.width * 2 - 2) / devicePixelRatio;
+         let webGLY = ((rect.height - (y - rect.top)) / rect.height * 2) / devicePixelRatio;
+         return { x: webGLX, y: webGLY };
+      }
+
+      // start GL coding
+      let mInverse = m => {
+         let dst = [], det = 0, cofactor = (c, r) => {
+            let s = (i, j) => m[c+i & 3 | (r+j & 3) << 2];
+            return (c+r & 1 ? -1 : 1) * ( (s(1,1) * (s(2,2) * s(3,3) - s(3,2) * s(2,3)))
+                                       - (s(2,1) * (s(1,2) * s(3,3) - s(3,2) * s(1,3)))
+                                       + (s(3,1) * (s(1,2) * s(2,3) - s(2,2) * s(1,3))) );
+         }
+         for (let n = 0 ; n < 16 ; n++) dst.push(cofactor(n >> 2, n & 3));
+         for (let n = 0 ; n <  4 ; n++) det += m[n] * dst[n << 2]; 
+         for (let n = 0 ; n < 16 ; n++) dst[n] /= det;
+         return dst;
+      }
+      let matrixMultiply = (a, b) => {
+      let dst = [];
+      for (let n = 0 ; n < 16 ; n++)
+         dst.push(a[n&3]*b[n&12] + a[n&3|4]*b[n&12|1] + a[n&3|8]*b[n&12|2] + a[n&3|12]*b[n&12|3]);
+      return dst;
+      }
+      let C = t => Math.cos(t);
+      let S = t => Math.sin(t);
+      let mIdentity = () => [ 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 ];
+      let mPerspective = (fl, m) => matrixMultiply(m, [1,0,0,0, 0,1,0,0, 0,0,1,-1/fl, 0,0,0,1]);
+      let mRotateX = (t, m) => matrixMultiply(m, [1,0,0,0, 0,C(t),S(t),0, 0,-S(t),C(t),0, 0,0,0,1]);
+      let mRotateY = (t, m) => matrixMultiply(m, [C(t),0,-S(t),0, 0,1,0,0, S(t),0,C(t),0, 0,0,0,1]);
+      let mRotateZ = (t, m) => matrixMultiply(m, [C(t),S(t),0,0, -S(t),C(t),0,0, 0,0,1,0, 0,0,0,1]);
+      let mScale = (x,y,z, m) => matrixMultiply(m, [x,0,0,0, 0,y,0,0, 0,0,z,0, 0,0,0,1]);
+      let mTranslate = (x,y,z, m) => matrixMultiply(m, [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+
+      function Matrix() {
+         let stack = [mIdentity()], top = 0;
+         let set = arg => { stack[top] = arg; return this; }
+         let get = () => stack[top];
+      
+         this.identity = () => set(mIdentity());
+         this.perspective = fl => set(mPerspective(fl, get()));
+         this.rotateX = t => set(mRotateX(t, get()));
+         this.rotateY = t => set(mRotateY(t, get()));
+         this.rotateZ = t => set(mRotateZ(t, get()));
+         this.scale = (x,y,z) => set(mScale(x,y,z, get()));
+         this.translate = (x,y,z) => set(mTranslate(x,y,z, get()));
+         this.get = () => get();
+         this.set = () => set();
+         this.save = () => set(stack[top++].slice());
+         this.restore = () => --top;
+      }
+
+      let start_gl = (canvas, vertexSize, vertexShader, fragmentShader) => {
+         let gl = canvas.getContext("webgl");
+
+         let program = gl.createProgram();
+         gl.program = program;
+         let addshader = (type, src) => {
+         let shader = gl.createShader(type);
+         gl.shaderSource(shader, src);
+         gl.compileShader(shader);
+         if (! gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+            throw "Cannot compile shader:\n\n" + gl.getShaderInfoLog(shader);
+         gl.attachShader(program, shader);
+         };
+         addshader(gl.VERTEX_SHADER  , vertexShader  );
+         addshader(gl.FRAGMENT_SHADER, fragmentShader);
+         gl.linkProgram(program);
+         if (! gl.getProgramParameter(program, gl.LINK_STATUS))
+         throw "Could not link the shader program!";
+         gl.useProgram(program);
+         gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+         gl.enable(gl.DEPTH_TEST);
+         gl.depthFunc(gl.LEQUAL);
+         let vertexAttribute = (name, size, position) => {
+         let attr = gl.getAttribLocation(program, name);
+         gl.enableVertexAttribArray(attr);
+         gl.vertexAttribPointer(attr, size, gl.FLOAT, false, vertexSize * 4, position * 4);
+         }
+         vertexAttribute('aPos', 3, 0);
+         vertexAttribute('aNor', 3, 3);
+         return gl;
+      }
+
+
+      /*// I'm borrowing some math from this excellent resource https://r-knott.surrey.ac.uk/fibonacci/phi3DGeom.html
+      let phi = (1 + Math.sqrt(5)) / 2; // golden ratio
+
+      // I tried doing it with the strToTris method -- it was hard to debug :/
+      let icosahedron_vertices = [
+         [-1,  phi, 0], //0
+         [ 1,  phi, 0], //1
+         [-1, -phi, 0], //2
+         [ 1, -phi, 0], //3
+         [ 0, -1,  phi], //4
+         [ 0,  1,  phi], //5
+         [ 0, -1, -phi], // 6
+         [ 0,  1, -phi], // 7
+         [ phi, 0, -1], // 8
+         [ phi, 0,  1], // 9
+         [-phi, 0, -1], // 10
+         [-phi, 0,  1] // 11
+      ]
+
+      let icosahedron_triangles = [
+         [0, 11, 5],  [0, 5, 1],  [0, 1, 7],   [0, 7, 10],  [0, 10, 11],
+         [1, 5, 9],   [5, 11, 4], [11, 10, 2], [10, 7, 6],  [7, 1, 8],
+         [3, 9, 4],   [3, 4, 2],  [3, 2, 6],   [3, 6, 8],   [3, 8, 9],
+         [4, 9, 5],   [2, 4, 11], [6, 2, 10],  [8, 6, 7],   [9, 8, 1]
+      ]
+
+      // I can't believe this worked
+      let icosahedron = icosahedron_triangles
+         .map(triangle => triangle.map(vertex => icosahedron_vertices[vertex]))
+         .map(triangle => {
+         let [a, b, c] = triangle;
+         // edge vectors -- if you get the edges between vertices you get 2 lines
+         let ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+         let vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+         // cross product -- if you cross them you get the normal vector
+         let x = uy * vz - uz * vy;
+         let y = uz * vx - ux * vz;
+         let z = ux * vy - uy * vx;
+         // length
+         let length = Math.sqrt(x*x + y*y + z*z);
+         // normalized normal
+         [x, y, z] = [x, y, z].map(n => n / length);
+         return [a, x, y, z, b, x, y, z, c, x, y, z];
+         })
+         .flat(Infinity)
+
+      // DEFINE ALL THE OBJECT COLORS AND SHAPES
+
+      let Ico       = { type: 0, mesh: new Float32Array(icosahedron) };
+
+      // VERY SIMPLE VERTEX AND FRAGMENT SHADERS
+*/
+
+// CREATE A TRIANGLE_STRIP MESH
+
+   let createMesh = (nu, nv, p) => {
+      let mesh = [];
+      for (let j = nv-1 ; j >= 0 ; j--) {
+         for (let i = 0 ; i <= nu ; i++)
+            mesh.push(p(i/nu,(j+1)/nv), p(i/nu,j/nv));
+         mesh.push(p(1,j/nv), p(0,j/nv));
+      }
+      return mesh.flat();
+   }
+
+   // DEFINE VARIOUS KINDS OF TRIANGLE_STRIP MESHES
+
+   let sphere = (nu, nv) => createMesh(nu, nv, (u,v) => {
+      let theta = 2 * Math.PI * u;
+      let phi = Math.PI * (v - .5);
+      let x = C(phi) * C(theta),
+         y = C(phi) * S(theta),
+         z = S(phi);
+      return [ x,y,z, x,y,z ];
+   });
+
+   let tube = (nu, nv) => createMesh(nu, nv, (u,v) => {
+      let x = C(2 * Math.PI * u),
+         y = S(2 * Math.PI * u),
+         z = 2 * v - 1;
+      return [ x,y,z, x,y,0 ];
+   });
+
+   let disk = (nu, nv) => createMesh(nu, nv, (u,v) => {
+      let x = v * C(2 * Math.PI * u),
+         y = v * S(2 * Math.PI * u);
+      return [ x,y,0, 0,0,1 ];
+   });
+
+   let cylinder = (nu, nv) => createMesh(nu, nv, (u,v) => {
+      let x = C(2 * Math.PI * u),
+         y = S(2 * Math.PI * u);
+      switch (5 * v >> 0) {
+      case 0: return [ 0,0,-1, 0,0,-1 ];
+      case 1: return [ x,y,-1, 0,0,-1 ];
+      case 2: return [ x,y,-1, x,y, 0 ];
+      case 3: return [ x,y, 1, x,y, 0 ];
+      case 4: return [ x,y, 1, 0,0, 1 ];
+      case 5: return [ 0,0, 1, 0,0, 1 ];
+      }
+   });
+
+   let torus = (nu, nv) => createMesh(nu, nv, (u,v) => {
+      let ct = C(2 * Math.PI * u);
+      let st = S(2 * Math.PI * u);
+      let cp = C(2 * Math.PI * v);
+      let sp = S(2 * Math.PI * v);
+      let x = (1 + .5 * cp) * ct,
+         y = (1 + .5 * cp) * st,
+         z =      .5 * sp;
+      return [ x,y,z, cp*ct,cp*st,sp ];
+   });
+
+   // SHORTCUT TO MAKE IT EASIER TO DEFINE CUBE AND OCTAHEDRON
+
+   let strToTris = str => {
+      let tris = [];
+      for (let n = 0 ; n < str.length ; n++)
+         switch (str.charAt(n)) {
+         case 'N': tris.push(-1    ); break;
+         case 'n': tris.push(-0.577); break;
+         case '0': tris.push( 0    ); break;
+         case 'p': tris.push( 0.577); break;
+         case 'P': tris.push( 1    ); break;
+         }
+      return tris;
+   }
+
+   // DEFINE SOME MESHES MADE FROM TRIANGLES
+
+   let cube = strToTris(`PNP00P PPP00P NPP00P  NPP00P NNP00P PNP00P
+                        NPN00N PPN00N PNN00N  PNN00N NNN00N NPN00N
+                        PPNP00 PPPP00 PNPP00  PNPP00 PNNP00 PPNP00
+                        NNPN00 NPPN00 NPNN00  NPNN00 NNNN00 NNPN00
+                        NPP0P0 PPP0P0 PPN0P0  PPN0P0 NPN0P0 NPP0P0
+                        PNN0N0 PNP0N0 NNP0N0  NNP0N0 NNN0N0 PNN0N0`);
+
+   let octahedron = strToTris(`00Nnnn 0N0nnn N00nnn  P00pnn 0N0pnn 00Npnn
+                              N00npn 0P0npn 00Nnpn  00Nppn 0P0ppn P00ppn
+                              00Pnnp 0N0nnp N00nnp  00Ppnp 0N0pnp P00pnp
+                              N00npp 0P0npp 00Pnpp  P00ppp 0P0ppp 00Pppp`);
+
+   // DEFINE ALL THE OBJECT SHAPES
+
+   let Cube       = { type: 0, mesh: new Float32Array(cube) };
+   let Cylinder   = { type: 1, mesh: new Float32Array(cylinder(20,  6)) };
+   let Disk       = { type: 1, mesh: new Float32Array(disk    (20,  1)) };
+   let Octahedron = { type: 0, mesh: new Float32Array(octahedron) };
+   let Sphere     = { type: 1, mesh: new Float32Array(sphere  (40, 40)) };
+   let Torus      = { type: 1, mesh: new Float32Array(torus   (30, 30)) };
+   let Tube       = { type: 1, mesh: new Float32Array(tube    (20,  1)) };
+
+let vertexSize = 6;
+      let vertexShader = `
+         attribute vec3 aPos, aNor;
+         uniform mat4 uMatrix, uInvMatrix;
+         varying vec3 vPos, vNor;
+         void main() {
+            vec4 pos = uMatrix * vec4(aPos, 1.0);
+            vec4 nor = vec4(aNor, 0.0) * uInvMatrix;
+            vPos = pos.xyz;
+            vNor = nor.xyz;
+            gl_Position = pos * vec4(1.,1.,-.1,1.);
+         }
+      `;
+
+      let fragmentShader = `
+         precision mediump float;
+         uniform vec3 uColor;
+         uniform float uTime;
+         varying vec3 vPos, vNor;
+
+         vec3 color;
+         float c;
+
+         void main(void) {
+            if (uColor == vec3(0., 1., 0.)) {
+                  c = .05 + max(0., dot(normalize(vNor), vec3(.57)));
+                  color = c * vec3(0.99, 0.99, 0.4);
+            } else {
+                  color = vec3(0.);
+            }
+            gl_FragColor = vec4(sqrt(color), 1.);
+         }
+      `;
+
+      // INITIALIZE GL AND GET UNIFORM NAMES
+
+      let gl, uColor, uInvMatrix, uMatrix, uTime;   
+
+      function reloadShaders() {
+         gl?.deleteProgram(gl.program);
+         gl = start_gl(render_canvas, vertexSize, vertexShader, fragmentShader);
+         uColor     = gl.getUniformLocation(gl.program, "uColor");
+         uInvMatrix = gl.getUniformLocation(gl.program, "uInvMatrix");
+         uMatrix    = gl.getUniformLocation(gl.program, "uMatrix");
+         uTime      = gl.getUniformLocation(gl.program, "uTime");
+      }    
+
+      reloadShaders();
+
+      // INSTANTIATE THE MATRIX OBJECT
+
+      let M = new Matrix();
+
+      // RENDER ONE SHAPE, AND GIVE IT A COLOR
+
+      let render = (Shape, color) => {
+         gl.uniform3fv      (uColor    , color );
+         gl.uniformMatrix4fv(uInvMatrix, false, mInverse(M.get()));
+         gl.uniformMatrix4fv(uMatrix   , false, M.get()          );
+
+         let mesh = Shape.mesh;
+         gl.bufferData(gl.ARRAY_BUFFER, mesh, gl.STATIC_DRAW);
+         gl.drawArrays(Shape.type ? gl.TRIANGLE_STRIP : gl.TRIANGLES, 0, mesh.length / vertexSize);
+      }
+
+      // THE ANIMATION LOOP
+
+      let startTime = Date.now() / 1000;
+
+      function renderFrame() {
+         requestAnimationFrame(renderFrame);
+         if (positions.length == 0) return;
+         let time = Date.now() / 1000 - startTime;
+         let {x, y} = positions[position];
+
+         gl.uniform1f(uTime, time);
+
+      }
+
+      resizeCanvas();
+      requestAnimationFrame(renderFrame);
+   </script>
+<!--Other Logic End-->
+
+</body>
+</html>
