@@ -1,0 +1,156 @@
+<script src=lib1.js></script>
+
+<body bgcolor=black text=white link=white alink=white vlink=white>
+<center>
+<canvas id='canvas1' width=400 height=400></canvas>
+</center>
+</body>
+
+
+<!!-------- VERTEX SHADER: YOU PROBABLY DON'T WANT TO CHANGE THIS RIGHT NOW -------->
+
+<script id='my_vertex_shader' type='x-shader/x-vertex'>
+   attribute vec3 aPos;
+   varying   vec3 vPos;
+   void main() {
+      gl_Position = vec4(aPos, 1.);
+      vPos = aPos;
+   }
+</script>
+
+
+<!!-------- FRAGMENT SHADER: THIS IS WHERE YOU WILL DO YOUR WORK -------->
+
+<script id='my_fragment_shader' type='x-shader/x-fragment'>
+
+ uniform float uTime;   // TIME, IN SECONDS
+ varying vec3 vPos;
+
+ // A FRAGMENT SHADER MUST DEFINE main().
+
+ void main() {
+   //Cycle through All Hues over time
+   float wave = cos(0.50 * vPos.x + uTime * 1.0);
+
+   // Map the wave value to a hue for the RGB color
+   float hue = 0.5 + 0.5 * wave;
+   // 6.28 Because of 2Pi, which completes 1 Complete Cycle for Cosine
+   // 0 for Red, 1/3 for Green and 2/3 for Blue
+   vec3 rgb = 0.5 + 0.5 * cos(6.283 * (vec3(0.0 + hue, 0.333 + hue, 0.666 + hue)));
+
+   // Define a Sphere Radius, let it pulsate with time
+   float radius = 0.5 + 0.1 * sin(uTime * 2.0); // Radius changes with time
+   float distance = length(vPos.xy); // Calculate distance from center
+   float z = sqrt(radius * radius - distance * distance); // Z-Coordinate
+
+   //Write Logic for a Sphere 
+   if (distance < radius) {
+      vec3 normal = normalize(vec3(vPos.xy, z));
+      vec3 lightDir = normalize(vec3(sin(uTime),cos(uTime),1.));
+      float brightness = max(dot(normal, lightDir), 0.0);
+      // Calculate brightness based on light direction
+
+   float cycleTime = mod(uTime, 6.0); // 6 seconds total for 3 colors (2 seconds each)
+    vec3 color;
+
+    if (cycleTime < 2.0) {
+      color = brightness*vec3(1.0, 0.0, 0.0); // Red Display Red
+  } 
+  else if (cycleTime < 4.0) {
+      color = brightness*vec3(0.0, 1.0, 0.0); // Display Green
+  }
+   else
+      color = brightness*vec3(0.0, 0.0, 1.0); // Display Blue
+      gl_FragColor = vec4(color, 1.0);
+   } else {
+      gl_FragColor = vec4(rgb, 0.1); // Apply full opacity for the background
+   }
+
+   
+
+ }
+</script>
+
+
+<!!-------- CREATE A PROPERLY DESCRIPTIVE TITLE BELOW -------->
+
+<script id='my_title' type='text/html'>
+Homework-1 of Saurabh Velankar - ssv7305
+</script>
+
+
+<!!-------- HERE IS WHERE YOU CAN PROVIDE A LONGER TEXT DESCRIPTION -------->
+
+<script id='my_instructions' type='text/html'><font color=#b0b0b0>
+<strong>What's happening?</strong>
+<br>
+1. The Background of the Entire Canvas changes color
+<br>
+with time, using a sine function.
+<br>
+2. The sphere was made using a similar logic as the Prof.
+<br>
+3. The color of the Sphere Changes every 2 seconds
+<br>
+4. The Light Direction changes in the form of a "Turn Table"
+</script>
+
+
+<!!-------- YOU PROBABLY DON'T WANT TO CHANGE ANYTHING BELOW FOR NOW -------->
+   
+<script>
+
+// CREATE THE HTML DOCUMENT
+
+let vs = my_vertex_shader.innerHTML,
+    fs = my_fragment_shader.innerHTML;
+    fs = fs.substring(1, fs.length);
+
+document.body.innerHTML = [''
+   ,'<center><font size=6 color=#b0b0b0>' + my_title.innerHTML + '</center>'
+   ,'<TABLE cellspacing=0 cellpadding=0><TR>'
+   ,'<td width=50></td><td><font color=red size=5><div id=errorMessage>&nbsp;</div></font></td>'
+   ,'</TR><TR>'
+   ,'<table cellspacing=10>'
+   ,'<tr>'
+   ,'<td valign=top><font size=2 color=red><div id=errorMarker>&nbsp;</div></font></td>'
+   ,'<td valign=top>'
+   ,'<textArea id=textArea spellcheck=false '
+   ,'style="font:16px courier;outline-width:0;border-style:none;resize:none;overflow:scroll;"'
+   ,'></textArea>'
+   ,'</td><td valign=top>' + document.body.innerHTML + '</td>'
+   ,'<td valign=top><font size=5>' + my_instructions.innerHTML + '</td>'
+   ,'</tr></table>'
+   ,'</TR></TABLE>'
+   ].join('');
+
+// SET UP THE EDITABLE TEXT AREA ON THE LEFT SIDE.
+
+let text = fs.split('\n'), cols = 0;
+for (let i = 0 ; i < text.length ; i++)
+   cols = Math.max(cols, text[i].length);
+
+textArea.rows = text.length;
+textArea.cols = cols;
+textArea.value = fs;
+textArea.style.backgroundColor = '#202020';
+textArea.style.color = 'white';
+
+// REPARSE THE SHADER PROGRAM AFTER EVERY KEYSTROKE.
+
+textArea.onkeyup = function() { canvas1.setShaders(vs, this.value); }
+
+// SET THE CURRENT TIME IN SECONDS BEFORE RENDERING EACH FRAME.
+
+let startTime = Date.now();
+
+function animate(gl) {
+   let time = (Date.now() - startTime) / 1000;
+   setUniform('1f', 'uTime', time);
+}
+
+// START EVERYTHING.
+
+gl_start(canvas1, vs, fs);
+</script>
+
