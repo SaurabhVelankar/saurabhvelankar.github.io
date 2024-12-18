@@ -1,0 +1,238 @@
+<body bgcolor=#000000>
+<div style = "color: white;">
+   <center><h2><strong>Final Project: Blunder3D! (Saurabh Velankar - ssv7305)</strong></h2>
+   <p><strong>What's happening?</strong>
+      <br>
+      1. A very badly designed mockup of my favourite 3D software, Blender3D. This whole idea was a blunder hence the name (along with Copyright issues XD)
+      <br>
+      2. Rotate the Scene using the Mouse Drag. Pan around the scene using <strong>Shift + Mouse Drag</strong>. Use Zoom slider to zoom. I also have buttons to shift between Orthogonal and Perspective.
+      <br>
+      3. Disable the Grid using the Buttons provided (it improves performance and is purely cosmetic!)
+      <br>
+      4. To Rotate the current object Press <strong>"R" Plus one of X-Y-or-Z</strong> buttons on the Keyboard and Use Key "I" and "K".
+      <br>
+      5. Same Logic for Move: Use <strong>Key "G"</strong> || Scale: <strong>Key "S"</strong>. Note: All Transforms are local to the object (i.e. non uniform)!
+   </p>
+   <br>
+   <button id="perspective">Perspective</button>
+   <button id="grid">Grid</button>
+   <!--Start Cutting! <input type=range id=progress style="width: 400" min=0 max=10 value=0 step=0.1></input>-->
+   Zoom <input type=range id=zoom style="width: 400" min=0.1 max=10 value=1.0 step=0.05></input>
+   <button id="reset">Reset Transforms</button>
+   <!--<button id="cylinder">Cylinder</button>-->
+</div>
+
+<canvas id=textureCanvas width=512 height=512 style=position:absolute;left:-1000></canvas>
+<canvas style="border: 2px solid white;" id=canvas1 width=1450 height=800></canvas></center>
+<script src=lib.js></script>
+<script>
+   const canvas = document.getElementById('canvas1');
+   //const gl = canvas.getContext('webgl');
+   function resizeCanvas() {
+      // Update WebGL's viewport to match the new canvas size
+      gl.viewport(0, 0, canvas.width, canvas.height);
+   }
+</script>
+<script>
+
+   // THE USER DRAGS THE MOUSE TO VARY rx AND ry
+   // To have Rotate and "Pan" at the same time
+   let mx, my, rx = 0, ry = 0;
+   let mx1, my1, rx1 = 0, ry1 = 0, isShift = 0;
+   canvas1.onmousedown = e => {
+      if(e.shiftKey)
+      {
+         mx1 = e.clientX;
+         my1 = e.clientY;
+      }
+      mx = e.clientX;
+      my = e.clientY;
+   }
+   canvas1.onmousemove = e => {
+      if(e.shiftKey)
+      {
+         isShift = 1;
+         if (mx1) {
+            rx1 += e.clientX - mx1;
+            ry1 += e.clientY - my1;
+            mx1 = e.clientX;
+            my1 = e.clientY;
+         }
+      }
+      else if (mx) {
+         isShift = 0;
+         rx += e.clientX - mx;
+         ry += e.clientY - my;
+         mx = e.clientX;
+         my = e.clientY;
+      }
+   }
+   canvas1.onmouseup = e => {
+      mx = undefined;
+      mx1 = undefined;
+   }
+
+//wood-3.png //wood-2.png //wood-1.jpg //wood-4.jpg  
+
+   /*texture(0, 'textures/wood-2.png');
+   texture(1, 'textures/wood-2-normal.png');
+   texture(2, 'textures/wood-3.png');
+   texture(3, 'textures/wood-3-normal.png');
+   texture(4, 'textures/wood-1.jpg');
+   texture(5, 'textures/wood-1-normal.jpg');
+   texture(6, 'textures/wood-4.jpg');
+   texture(7, 'textures/wood-4-normal.jpg');
+   texture(8, 'textures/metal-1.jpg');
+   texture(9, 'textures/machine-1.jpg');
+   texture(10, 'textures/machine-1-normal.jpg');*/
+
+   // Initialize variables
+   let moveX = 0, moveY = 0, moveZ = 0;
+   let isMoveX = 0, isMoveY = 0, isMoveZ = 0;
+
+   let rotX = 0, rotY = 0, rotZ = 0;
+   let isRotX = 0, isRotY = 0, isRotZ = 0;
+
+   let scaleX = 0, scaleY = 0, scaleZ = 0;
+   let isScaleX = 0, isScaleY = 0, isScaleZ = 0; 
+
+   let isGrid = 1;
+   let isPerspective = 3;
+
+   // -------------------------- Grid and Prespective Logic----------------------------
+   // Get buttons by their IDs
+   const gridButton = document.getElementById('grid');
+   const perspectiveButton = document.getElementById('perspective');
+
+   // Add event listeners to toggle the values
+   gridButton.addEventListener('click', () => {
+      isGrid = isGrid === 0 ? 1 : 0; // Toggle between 0 and 1
+      console.log('Grid:', isGrid);  // For debugging
+   });
+
+   perspectiveButton.addEventListener('click', () => {
+      isPerspective = isPerspective === 3 ? 1 : 3; // Toggle between 0 and 1
+      console.log('Perspective:', isPerspective); // For debugging
+   });
+   // -----------------------------------------------------------------------------------
+
+   // ---------------------------Keyboard Input Transform Logic--------------------------
+   let isX = 0, isY = 0, isZ = 0, isR = 0, isS = 0, isG = 0;
+
+   function resetMove() { isMoveX = 0; isMoveY = 0; isMoveZ = 0;}
+   function resetScale() { isScaleX = 0; isScaleY = 0; isScaleZ = 0;}
+   function resetRotate() { isRotX = 0; isRotY = 0; isRotZ = 0; }
+
+   document.addEventListener('keydown', (event) => {
+      if (event.key === 'r' || event.key === 'R') {isR = 1; isG = 0; isS = 0}
+      if (event.key === 'S' || event.key === 's') {isR = 0; isG = 0; isS = 1}
+      if (event.key === 'g' || event.key === 'G') {isR = 0; isG = 1; isS = 0}
+
+         // Detect modifier keys to activate rotation flags
+         if(isR)
+         {
+            resetMove();
+            resetScale();
+            if (event.key === "X" || event.key === "x") {isRotX = 1; isRotY = 0; isRotZ = 0;}
+            else if (event.key === "Y" || event.key === "y") {isRotX = 0; isRotY = 1; isRotZ = 0;}
+            else if (event.key === "Z" || event.key === "z") {isRotX = 0; isRotY = 0; isRotZ = 1;}
+         } else if(isS) {
+            resetMove();
+            resetRotate();
+            if (event.key === "X" || event.key === "x") {isScaleX = 1; isScaleY = 0; isScaleZ = 0;}
+            else if (event.key === "Y" || event.key === "y") {isScaleX = 0; isScaleY = 1; isScaleZ = 0;}
+            else if (event.key === "Z" || event.key === "z") {isScaleX = 0; isScaleY = 0; isScaleZ = 1;}
+         } else if(isG) {
+            resetRotate();
+            resetScale();
+            if (event.key === "X" || event.key === "x") {isMoveX = 1; isMoveY = 0; isMoveZ = 0;}
+            else if (event.key === "Y" || event.key === "y") {isMoveX = 0; isMoveY = 1; isMoveZ = 0;}
+            else if (event.key === "Z" || event.key === "z") {isMoveX = 0; isMoveY = 0; isMoveZ = 1;}
+         } else {
+            isRotX = 0; isRotY = 0; isRotZ = 0;
+            isScaleX = 0; isScaleY = 0; isScaleZ = 0;
+            isMoveX = 0; isMoveY = 0; isMoveZ = 0;
+         }
+
+         
+      //}
+      if (event.key === 'i' || event.key === 'I') {
+         if (isRotX) rotX += 0.05; if (isRotY) rotY += 0.05; if (isRotZ) rotZ += 0.05;
+         if (isMoveX) moveX += 0.05; if (isMoveY) moveY += 0.05; if (isMoveZ) moveZ += 0.05;
+         if (isScaleX) scaleX += 0.05; if (isScaleY) scaleY += 0.05; if (isScaleZ) scaleZ += 0.05;
+
+      } else if (event.key === 'k' || event.key === 'K') {
+         if (isRotX) rotX -= 0.05; if (isRotY) rotY -= 0.05; if (isRotZ) rotZ -= 0.05;
+         if (isMoveX) moveX -= 0.05; if (isMoveY) moveY -= 0.05; if (isMoveZ) moveZ -= 0.05;
+         if (isScaleX) scaleX -= 0.05; if (isScaleY) scaleY -= 0.05; if (isScaleZ) scaleZ -= 0.05;
+      }
+      // Debugging output
+      console.log(`rotX: ${rotX}, rotY: ${rotY}, rotZ: ${rotZ},
+                  isRotX: ${isRotX}, isRotY: ${isRotY}, isRotZ: ${isRotZ}, isR: ${isR}
+                  moveX: ${moveX}, moveY: ${moveY}, moveZ: ${moveZ},
+                  isMoveX: ${isMoveX}, isMoveY: ${isMoveY}, isMoveZ: ${isMoveZ}, isG: ${isG}
+                  scaleX: ${scaleX}, scaleY: ${scaleY}, scaleZ: ${scaleZ},
+                  isScaleX: ${isScaleX}, isScaleY: ${isScaleY}, isScaleZ: ${isScaleZ}, isS: ${isS}
+                  `);
+   });
+
+   document.getElementById('reset').addEventListener('click', function() {
+      rotX = 0; rotY = 0; rotZ = 0;
+      moveX = 0; moveY = 0; moveZ = 0;
+      scaleX = 0; scaleY = 0; scaleZ = 0; 
+      console.log("rotX has been reset to:", rotX);
+   });   
+   // ---------------------------------------------------------------------------------
+
+   // ---------------------------  Main Logic -----------------------------------------
+
+   function drawFrame() {
+      requestAnimationFrame(drawFrame);
+      let t = Date.now() / 1000;
+
+      //turnY(2.435) for ideal Isometric Projection Angle
+      // Follow this order: Shape, color, opacity, texture, bumpTexture
+      M.S().perspective(isPerspective)
+         M.turnX(0.5)
+         // Pan and Rotate the Character based on the X and Y values (Shift should be pressed along with Mouse!)
+         if(isShift) {
+            M.move(rx1/1000, -ry1/1000, 0);
+         } else {
+            M.turnX(ry/100).turnY(rx/100)
+         }
+         M.scale(zoom.value)
+
+         M.S().turnY(2.435) // Use this Rotation Orientation for all Objects to Align with the Axis
+            M.S().move(-0.2 + moveX, 0.0 + moveY, 0.2 + moveZ).scale(0.075 + scaleX, 0.1 + scaleY, 0.075 + scaleZ).turnX(rotX).turnZ(rotZ).turnY(rotY).draw(Cube(), [1,1,1], 1).R()
+         M.R()
+
+         M.S().turnY(2.435) // The Axis Makings for the Z Direction
+            if(isGrid)
+            {
+               for(let i = -10; i < 10; i = i + 0.1)
+               {
+                  M.S().move(0.0+i,0.0,0.0).scale(0.0005, 0.0005, 10).draw(Cylinder(40), [0.9,0.9,0.9], 1).R();
+               }   
+            }
+            M.S().scale(10, 0.002, .002).draw(Cylinder(40,1), [0.0,0.1,1.0], 1).R();
+         M.R()
+
+         M.S().turnY(2.435) // The Axis Makings for the X Direction
+            if(isGrid)
+            {
+               for(let i = -10; i < 10; i = i + 0.1)
+               {
+                  M.S().move(0.0,0.0,0.0+i).scale(10, 0.0005, .0005).draw(Cylinder(40), [0.9,0.9,0.9], 1).R();
+               }                  
+            }   
+            M.S().scale(0.002, 0.002, 10).draw(Cylinder(40,1), [0.0,1.0,0.1], 1).R();
+         M.R()
+         M.S().scale(0.001, 100, .001).draw(Cube(), [1.0,0.0,0.0], 1).R();
+         M.S().scale(0.01, 0.016,0.01).draw(Sphere(40), [1.0,1,1.0], 1).R(); // Center Sphere for (0,0)
+      M.R()
+   }
+   requestAnimationFrame(drawFrame);
+// ---------------------------------------------------------------------------------
+  
+</script>
+
