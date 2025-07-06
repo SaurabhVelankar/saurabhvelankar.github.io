@@ -1,0 +1,265 @@
+<style>
+    h2 {text-align: center; color: white;}
+    p {text-align: center; color: white;}
+    div {text-align: center;}
+</style>
+
+<body bgcolor=black></body>
+<div class = "desc">
+<h2>Homework 4: Saurabh Velankar, ssv7305</h2>    
+<p>
+<strong>What's Happening?</strong>
+<br>
+1. Made the matrix.js, quadrics,js and fragmentshader.js file, which contains the logic
+<br>
+2. The Trees have a weird set of colors because they are supposed to represent seasons in a year, but oh well :(
+<br>
+3. I first added the "wispy_clouds" textures, but somehow the idea of a humongous alien planet swallowing the peaceful scene felt so much better
+<br>
+4. The "Ground" and the "Sun" is a simple cube and Sphere
+<br>
+</p>
+</div>
+
+    <center>
+    <canvas id='canvas1' width=800 height=800></canvas>
+    
+    <script src="matrix.js"></script>
+    <script src="quadric.js"></script>
+    <script src="fragmentShader.js"></script>
+
+    <script type="module">
+    
+    const NQ = 18;    
+
+    let vertexSize = 3;
+    let vertexShader = `
+        attribute vec3 aPos;
+        varying   vec3 vPos;
+        void main() {
+            gl_Position = vec4(aPos, 1.0);
+            vPos = aPos;
+        }
+    `;
+    
+    let fragmentShader = _fragmentShader(NQ);
+    
+    // INITIALIZE GPU PROGRAM
+    
+    let start_gl = (canvas, meshData, vertexSize, vertexShader, fragmentShader) => {
+        let gl = canvas.getContext("webgl");
+        let program = gl.createProgram();
+        gl.program = program;
+        let addshader = (type, src) => {
+            let shader = gl.createShader(type);
+            gl.shaderSource(shader, src);
+            gl.compileShader(shader);
+            if (! gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+                throw "Cannot compile shader:\n\n" + gl.getShaderInfoLog(shader);
+            gl.attachShader(program, shader);
+        };
+        addshader(gl.VERTEX_SHADER  , vertexShader  );
+        addshader(gl.FRAGMENT_SHADER, fragmentShader);
+        gl.linkProgram(program);
+        if (! gl.getProgramParameter(program, gl.LINK_STATUS))
+            throw "Could not link the shader program!";
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        let vertexAttribute = (name, size, position) => {
+            let attr = gl.getAttribLocation(program, name);
+            gl.enableVertexAttribArray(attr);
+            gl.vertexAttribPointer(attr, size, gl.FLOAT, false, vertexSize * 4, position * 4);
+        }
+        vertexAttribute('aPos', 3, 0);
+        return gl;
+    }
+
+    let r = canvas1.getBoundingClientRect(), cursor = [0,0,0];
+    let setCursor = (e, z) => cursor = [ (e.clientX - r.left) / canvas1.width * 2 - 1,
+                                            1 - (e.clientY - r.top) / canvas1.height * 2,
+                                            z !== undefined ? z : cursor[2] ];
+    canvas1.onmousedown = e => setCursor(e, 1);
+    canvas1.onmousemove = e => setCursor(e,  );
+    canvas1.onmouseup   = e => setCursor(e, 0);
+    
+    // TRIANGLE DATA (IN THIS CASE, ONE SQUARE)
+    
+    let meshData = [
+        { type: 1, mesh: new Float32Array([ -1,1,0, 1,1,0, -1,-1,0, 1,-1,0 ]) },
+    ];
+    
+    let matrixInverse = src => {
+        let dst = [], det = 0, cofactor = (c, r) => {
+            let s = (i, j) => src[c+i & 3 | (r+j & 3) << 2];
+            return (c+r & 1 ? -1 : 1) * ( (s(1,1) * (s(2,2) * s(3,3) - s(3,2) * s(2,3)))
+                                        - (s(2,1) * (s(1,2) * s(3,3) - s(3,2) * s(1,3)))
+                                        + (s(3,1) * (s(1,2) * s(2,3) - s(2,2) * s(1,3))) );
+        }
+        for (let n = 0 ; n < 16 ; n++) dst.push(cofactor(n >> 2, n & 3));
+        for (let n = 0 ; n <  4 ; n++) det += src[n] * dst[n << 2];
+        for (let n = 0 ; n < 16 ; n++) dst[n] /= det;
+        return dst;
+    }
+    
+    setTimeout(() => {
+        let gl = start_gl(canvas1, meshData, vertexSize, vertexShader, fragmentShader);
+    
+        // FIND LOCATIONS IN GPU PROGRAM OF UNIFORM VARIABLES
+    
+        let uFL       = gl.getUniformLocation(gl.program, "uFL"    );
+        let uTime     = gl.getUniformLocation(gl.program, "uTime"  );
+        let uCursor   = gl.getUniformLocation(gl.program, "uCursor"); 
+        let uL        = gl.getUniformLocation(gl.program, "uL"     ); 
+        let uA        = gl.getUniformLocation(gl.program, "uA"     ); 
+        let uB        = gl.getUniformLocation(gl.program, "uB"     ); 
+        let uC        = gl.getUniformLocation(gl.program, "uC"     ); 
+    
+        const materials = [
+            [0.56, 0.93, 0.56], // Spring Colors
+            [0.42, 0.56, 0.14],
+            [0.56, 0.93, 0.56],
+            [0.55, 0.27, 0.07], // Brown__________
+            [0.18, 0.55, 0.34], // Summer Colors
+            [0.13, 0.37, 0.22],
+            [0.13, 0.37, 0.22],
+            [0.55, 0.27, 0.07], // Brown____________
+            [0.85, 0.33, 0.10], // Fall/Autumn Colors
+            [0.72, 0.25, 0.05],
+            [0.93, 0.69, 0.13],
+            [0.55, 0.27, 0.07], // Brown____________
+            [0.53, 0.81, 0.92], // Winter Colors
+            [0.33, 0.49, 0.42],
+            [0.33, 0.49, 0.72],
+            [0.55, 0.27, 0.07], // Brown____________
+            [0.48, 0.73, 0.36], // Ground Color
+            [1., 1., 1.], // Sun in the Sky
+
+        ];
+    
+        const highlights = [
+        [0.56, 0.93, 0.56], // Spring Colors
+            [0.42, 0.56, 0.14],
+            [0.56, 0.93, 0.56],
+            [0.55, 0.27, 0.07], // Brown__________
+            [0.18, 0.55, 0.34], // Summer Colors
+            [0.13, 0.37, 0.22],
+            [0.13, 0.37, 0.22],
+            [0.55, 0.27, 0.07], // Brown____________
+            [0.85, 0.33, 0.10], // Fall/Autumn Colors
+            [0.72, 0.25, 0.05],
+            [0.93, 0.69, 0.13],
+            [0.55, 0.27, 0.07], // Brown____________
+            [0.53, 0.81, 0.92], // Winter Colors
+            [0.33, 0.49, 0.42],
+            [0.33, 0.49, 0.72],
+            [0.55, 0.27, 0.07], // Brown____________
+            [0.55, 0.27, 0.07], // Ground Color
+            [1.0, 0.0, 0.0], // Sun in the Sky
+
+        ];
+    
+        const powers = [8.0, 6.0, 20.0, 8.0, 2.0, 9.0, 8.0, 8.0, 8.0, 6.0, 20.0, 8.0, 8.0, 6.0, 20.0, 8.0, 8.0, 6.0];
+    
+        const uMaterialsLocation = gl.getUniformLocation(gl.program, 'uMaterials');
+        const uHighlightsLocation = gl.getUniformLocation(gl.program, 'uHighlights');
+        const uPowersLocation = gl.getUniformLocation(gl.program, 'uPowers');
+    
+        gl.uniform3fv(uMaterialsLocation, new Float32Array(materials.flat()));
+        gl.uniform3fv(uHighlightsLocation, new Float32Array(highlights.flat()));
+        gl.uniform1fv(uPowersLocation, new Float32Array(powers));
+    
+        // ANIMATE AND RENDER EACH ANIMATION FRAME
+    
+        let startTime = Date.now() / 1000;
+        setInterval(() => {
+            
+            // SET UNIFORM VARIABLES
+    
+            let time = Date.now() / 1000 - startTime;
+            gl.uniform1f(uTime, time);
+            gl.uniform3fv(uCursor, cursor);
+            gl.uniform3fv(uL, [-.57,-.57,-.57, .57,.57,.57]);
+            gl.uniform1f(uFL, 3);
+
+            // My Shape Animation and Position Definitions
+            let Tree1_part1 = multiply(multiply(translation(-3.5,2.0,-20), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree1_part2 = multiply(multiply(translation(-3.5,1.2,-20), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree1_part3 = multiply(multiply(translation(-3.5,0.2,-20), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree1_stump = multiply(multiply(translation(-3.5,-1.3,-20.5), rotationX(-0.15)),scale(0.3,2.0,0.3));
+            // Tree 2
+            let Tree2_part1 = multiply(multiply(translation(-1.3,2.0,-16), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree2_part2 = multiply(multiply(translation(-1.3,1.2,-16), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree2_part3 = multiply(multiply(translation(-1.3,0.2,-16), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree2_stump = multiply(multiply(translation(-1.3,-1.3,-16.5), rotationX(-0.15)),scale(0.3,2.0,0.3));
+            // Tree 3
+            let Tree3_part1 = multiply(multiply(translation(0.5,2.0,-22), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree3_part2 = multiply(multiply(translation(0.5,1.2,-22), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree3_part3 = multiply(multiply(translation(0.5,0.2,-22), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree3_stump = multiply(multiply(translation(0.5,-1.3,-22.5), rotationX(-0.15)),scale(0.3,2.0,0.3));
+            // Tree 4
+            let Tree4_part1 = multiply(multiply(translation(2.5,2.0,-18), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree4_part2 = multiply(multiply(translation(2.5,1.2,-18), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree4_part3 = multiply(multiply(translation(2.5,0.2,-18), rotationX(-0.15)),scale(1.0,2.,1.0));
+            let Tree4_stump = multiply(multiply(translation(2.5,-1.3,-18.5), rotationX(-0.15)),scale(0.3,2.0,0.3));
+            // Ground Plane and SUn
+            let Ground = multiply(multiply(translation(0.,-5.3,-18.5), rotationX(-0.45)),scale(10.0,.3,9.0));
+            let Sun = multiply(multiply(translation(3.1,3.3,-18.5), rotationX(-0.15)),scale(.5,0.5,0.5));   
+            
+            // ANIMATE ALL QUADRICS FOR THIS FRAME
+            let transform = (Q,M) => {
+                let MI = matrixInverse(M);
+                return multiply(transpose(MI), multiply(Q, MI));
+            }
+    
+            let MA = [], MB = [], MC = [];
+    
+            let addShape = (M,a,b,c) => {
+                MA.push(transform(a, M));
+                MB.push(transform(b===undefined ? everywhere : b, M));
+                MC.push(transform(c===undefined ? everywhere : c, M));
+            }
+    
+            // Render Tree 1
+            addShape(Tree1_part1, yParaboloid, ySlab);
+            addShape(Tree1_part2, yParaboloid, ySlab);
+            addShape(Tree1_part3, yParaboloid, ySlab);
+            addShape(Tree1_stump, yCylinder, ySlab);
+            // Render Tree 2 
+            addShape(Tree2_part1, yParaboloid, ySlab);
+            addShape(Tree2_part2, yParaboloid, ySlab);
+            addShape(Tree2_part3, yParaboloid, ySlab);
+            addShape(Tree2_stump, yCylinder, ySlab);
+            // Render Tree 3 
+            addShape(Tree3_part1, yParaboloid, ySlab);
+            addShape(Tree3_part2, yParaboloid, ySlab);
+            addShape(Tree3_part3, yParaboloid, ySlab);
+            addShape(Tree3_stump, yCylinder, ySlab);
+            // Render Tree 4
+            addShape(Tree4_part1, yParaboloid, ySlab);
+            addShape(Tree4_part2, yParaboloid, ySlab);
+            addShape(Tree4_part3, yParaboloid, ySlab);
+            addShape(Tree4_stump, yCylinder, ySlab);
+            // Render the Ground Plane
+            addShape(Ground, xSlab, ySlab, zSlab)
+            // Render the Sun
+            addShape(Sun, sphere);
+
+
+            // SEND QUADRIC DATA TO THE FRAGMENT SHADER
+            gl.uniformMatrix4fv(uA, false, new Float32Array(MA.flat()));
+            gl.uniformMatrix4fv(uB, false, new Float32Array(MB.flat()));
+            gl.uniformMatrix4fv(uC, false, new Float32Array(MC.flat()));
+    
+            // RENDER THE FRAME
+            for (let n = 0 ; n < meshData.length ; n++) {
+                let mesh = meshData[n].mesh;
+                gl.bufferData(gl.ARRAY_BUFFER, mesh, gl.STATIC_DRAW);
+                gl.drawArrays(meshData[n].type ? gl.TRIANGLE_STRIP : gl.TRIANGLES, 0, mesh.length / vertexSize);
+            }
+        }, 30);
+    }, 100);
+    </script>
+    
+        
